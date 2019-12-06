@@ -14,7 +14,8 @@ pd.set_option("display.max_columns", 100)
 def preprocessing(conveyor_name, column_list, filepath):
 
     # columns= ['Conveyor', 'Action', 'Time']
-    raw_data = pd.read_csv(filepath, sep=';', header=None, names=column_list)
+    #filepath = '/home/pi/PycharmProjects/untitled/pm_API/timestamps.csv'
+    raw_data = pd.read_csv(str(filepath), sep=';', header=None, names=column_list)
     #print(raw_data.head())
 
     conveyors = raw_data[raw_data['Conveyor'] == conveyor_name]
@@ -34,9 +35,9 @@ def preprocessing(conveyor_name, column_list, filepath):
     #print (conveyor.head())
     #print (conveyors.head())
     conveyor['Transport_time'] = conveyor['Time2'] - conveyor['Time']
-    print(conveyor.head())
-    print(conveyor.tail())
+    #print(conveyor.head())
+    #print(conveyor.tail())
     print(conveyor['Transport_time'].max())
     print(conveyor['Transport_time'].min())
-    conveyor_processed = conveyor[['Number', 'Transport_time']]
+    conveyor_processed = conveyor[['Conveyor', 'Time', 'Transport_time']]
     return conveyor_processed
