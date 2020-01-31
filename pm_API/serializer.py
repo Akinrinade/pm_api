@@ -2,6 +2,7 @@
 
 from rest_framework import serializers
 from .models import conveyor
+print('###############################################checking serializers')
 
 class ConveyorSerializer(serializers.Serializer):
     conveyor_name = serializers.CharField(max_length=20)

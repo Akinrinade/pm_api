@@ -5,7 +5,7 @@ from django.shortcuts import render
 from django.http import HttpResponse
 from pandas._libs import json
 
-from .models import*
+from .models import *
 
 from rest_framework import status
 from rest_framework.decorators import api_view
@@ -16,21 +16,26 @@ import pandas as pd
 import threading
 import time
 import numpy as np
-import seaborn as sns;sns.set()
-import matplotlib.pyplot as plt
-# Create your views here.
+import seaborn as sns;
 
+sns.set()
+import matplotlib.pyplot as plt
+
+# Create your views here.
+print('###############################################checking views')
 max_threshold = 0
 min_threshold = 0
+
+
 def index(request):
     return HttpResponse("Hello, world. You're at my first index.")
 
 
 def implement_spc_in_thread(df, finished):
-    #a = spc(conveyor_name) + ewma()
-    #ax = sns.lineplot(data=df, err_style='band', ci='sd')
-    #ax.plot()
-    #plt.show()
+    # a = spc(conveyor_name) + ewma()
+    # ax = sns.lineplot(data=df, err_style='band', ci='sd')
+    # ax.plot()
+    # plt.show()
     # print(a)
     # max_threshold = a.summary[0].get('ucl')[-1]
     # min_threshold = a.summary[0].get('lcl')[-1]
@@ -39,8 +44,8 @@ def implement_spc_in_thread(df, finished):
     finished = True
     return finished
 
-def plot_view(min, max):
 
+def plot_view(min, max):
     ax = sns.lineplot(data=min, err_style='band', ci='sd')
     ax.plot()
     ax = sns.lineplot(data=max, err_style='band', ci='sd')
@@ -48,29 +53,41 @@ def plot_view(min, max):
     plt.savefig()
 
 
+def is_outlier(new_read, lower, upper):
+    if lower <= new_read <= upper:
+        return False
+    else:
+        return True
+
+def get_agent_data(agentname):
+
+    return conveyor_thresholds.get[agentname]
+
 @api_view(['GET', 'POST'])
 def conveyor_list(request):
     """
     List all convetors of a particular conveyor.
     """
     if request.method == 'GET':
-        conveyor_object = conveyor.objects.all()
-        #conveyor_object = [{'conveyor_name':'ConveyorA', 'read_time': 1500002343, 'read_value': 3445}]
-        content = {
-            'user': str(request.user),  # `django.contrib.auth.User` instance.
-            'auth': str(request.auth),  # None
-        }
-        print('authentication_content = {}'.format(content))
-        print(request.GET)
-        print(request.GET['param'])
+        # Treat the GET object
         request_object = {}
+        # split get object string to list
         param = request.GET['param'].split(',')
-        request_object['conveyor_name'] =param[0]
+        print(param)
+        conveyor_name = str(param[0])
+        request_object['conveyor_name'] = conveyor_name
         request_object['read_time'] = int(param[1])
         request_object['read_value'] = int(param[2])
+        print(request_object)
+        new_read = request_object['read_value']
 
-        f = request_object['read_value']
-        if f >= conveyorA_parameters['lower'] and f <= conveyorA_parameters['upper']:
+        agent = conveyor_thresholds[conveyor_name]
+        #agent = dict(get_agent_data(conveyor_name))
+        lower = agent['lower']
+        upper = agent['upper']
+        outlier = is_outlier(new_read, lower, upper)
+
+        if not outlier:
             print('Value is valid')
             serializer = ConveyorSerializer(request_object)
             serializer.create(request_object)
@@ -79,19 +96,18 @@ def conveyor_list(request):
                 df['Conveyor'] = request_object['conveyor_name']
                 df['Time'] = request_object['read_time']
                 df['Transport_time'] = request_object['read_value']
-                conveyorA.append(df)
-                conv = conveyorA[['Transport_time']]
-                finished = False
+                agent_dataframe= agent['dataobject']
+                agent_dataframe.append(df)
+                conv = agent_dataframe[['Transport_time']]
                 ema = conv.ewm(com=0.5).mean()
                 ema.columns = ['average']
-
-                a = spc(conveyorA[['Transport_time']]) + ewma()
-
+                a = spc(agent_dataframe[['Transport_time']]) + ewma()
                 print(a)
-
                 A = a.summary[0].get('ucl')[-1]
                 B = a.summary[0].get('lcl')[-1]
 
+                conveyor_thresholds[conveyor_name]['lower'] = B
+                conveyor_thresholds[conveyor_name]['upper'] = A
                 print(max_threshold)
                 print(min_threshold)
 
@@ -106,62 +122,14 @@ def conveyor_list(request):
                 print('lower_threshold ={}'.format(mean - stds))
                 print('upper_threshold ={}'.format(mean + stds))
                 print('Status={}'.format(status.HTTP_201_CREATED))
-                response = {'upper':A, 'lower':B}
-                #response = json.dumps(response)
+                response = {'Conveyor_name':conveyor_name,'upper':A, 'lower':B}
+                #response = conveyor_thresholds[conveyor_name]
+                response = json.dumps(response)
                 return Response(response, status=status.HTTP_201_CREATED)
-        #serializer = ConveyorSerializer(conveyor_object, many=True)
-        return Response(serializer.data)
-
-    elif request.method == 'POST':
-        print('request={}'.format(request))
-        print('request.data={}'.format(request.data))
-
-        for item in request.data:
-            print('item= {}'.format(item))
-            request_object = json.loads(item)
-            print(request_object)
-            request_object['read_time'] = int(request_object['read_time'])
-            request_object['read_value'] = int(request_object['read_value'])
-
-            f=request_object['read_value']
-            if f >= conveyorA_parameters['lower'] and f <= conveyorA_parameters['upper']:
-                print('Value is valid')
-                serializer = ConveyorSerializer(request_object)
-                serializer.create(request_object)
-                if status.HTTP_201_CREATED:
-                    df=pd.DataFrame(columns=['Conveyor','Time','Transport_time'])
-                    df['Conveyor'] = request_object['conveyor_name']
-                    df['Time'] = request_object['read_time']
-                    df['Transport_time'] = request_object['read_value']
-                    conveyorA.append(df)
-                    conv = conveyorA[['Transport_time']]
-                    finished=False
-                    ema = conv.ewm(com=0.5).mean()
-                    ema.columns = ['average']
-
-                    a = spc(conveyorA[['Transport_time']]) + ewma()
-
-                    print(a)
-                    #print(a.summary[0].get('ucl').mean)
-                    A = a.summary[0].get('ucl')[-1]
-                    B = a.summary[0].get('lcl')[-1]
-                    #plot_
-                    print(max_threshold)
-                    print(min_threshold)
-
-                    print('ema.columns={}'.format(ema.columns))
-                    mean = ema['average'][-1:]
-
-                    print('type = {}'.format(type(mean)))
-                    stds = ema['average'].std()
-                    print('ema.head={}'.format(ema))
-                    print('standard deviation={}'.format(stds))
-                    print('Mean={}'.format(mean))
-                    print('lower_threshold ={}'.format(mean-stds))
-                    print('upper_threshold ={}'.format(mean + stds))
-                    print('Status={}'.format(status.HTTP_201_CREATED))
-                    return Response(serializer.data, status=status.HTTP_201_CREATED)
-            else:
-                print('value not within threshold')
-
-            return Response('value not within  Threshold', status=status.HTTP_400_BAD_REQUEST)
+        else:
+            conveyor_thresholds[conveyor_name]['outliers'] = new_read
+            #response = conveyor_thresholds[conveyor_name]
+            response = {'Conveyor_name': conveyor_name, 'upper': upper, 'lower': lower}
+            return Response(response, status=status.HTTP_201_CREATED)
+    else:
+        return Response('Only "GET" request are treated at this moment', status=status.HTTP_400_BAD_REQUEST)
