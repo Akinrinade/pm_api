@@ -21,29 +21,20 @@ def load_archived_data(filepath, column_list):
     return raw_dataframe
 
 
-def preprocessing(raw_dataframe, conveyor_name, column_list):
-
-    # load Archived data stored in file as CSV
-    #raw_data = pd.read_csv(str(filepath), sep=';', header=None, names=column_list)
-
-    #   get the number unique agent data present in data
-    # agents = list(raw_data['Conveyor'].unique())
-    # #get the number of Agents
+def get_action_dfs(raw_dataframe, action1, action2):
+    actions_df1 = raw_dataframe[raw_dataframe['Action'] == action1]
+    actions_df2 = raw_dataframe[raw_dataframe['Action'] == action2]
+    return actions_df1, actions_df2
 
 
-    #filter by conveyor name
-    conveyors = raw_dataframe[raw_dataframe['Conveyor'] == conveyor_name]
-    conveyor = conveyors[conveyors['Action'] == 'Received']
-    conveyor_sent = conveyors[conveyors['Action'] == 'Sent']
-    conveyor['Number'] = [i for i in range(1, conveyor.shape[0]+1)]
-    conveyor.set_index(keys =['Number'])
-    conveyor_sent['Number'] = [i for i in range(1, conveyor_sent.shape[0]+1)]
-    conveyor_sent.set_index(keys =['Number'])
-    conveyor_sent.columns =['Conveyor2', 'Action2', 'Time2', 'Number']
+def calculate(raw_dataframe):
+    raw_dataframe['Next Conveyor']=raw_dataframe['Conveyor'].shift(-1)
+    raw_dataframe['Received Time'] = raw_dataframe['Time'].shift(-1)
+    raw_dataframe['Transport_time']= raw_dataframe['Received Time'] - raw_dataframe['Time']
+    print ('Raw dataframe head after calculate ={}'.format(raw_dataframe.head()))
+    sent_df = raw_dataframe[raw_dataframe['Action']=='Sent']
+    print('Filtered sent df  = {}'.format(sent_df.head()))
+    sent_df= sent_df[['Conveyor', 'Time', 'Transport_time']]
+    return sent_df
 
-    conveyor = pd.merge(conveyor, conveyor_sent, on='Number')
-    conveyor['Transport_time'] = conveyor['Time2'] - conveyor['Time']
-    print(conveyor['Transport_time'].max())
-    print(conveyor['Transport_time'].min())
-    conveyor_processed = conveyor[['Conveyor', 'Time', 'Transport_time']]
-    return conveyor_processed
+

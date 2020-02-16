@@ -5,7 +5,7 @@ import numpy as np
 import seaborn as sb
 from .spc_spc import *
 
-from untitled.pm_API.spc_spc import preprocessing
+#from untitled.pm_API.spc_spc import preprocessing
 
 filepath ='timestamps.csv'
 columns= ['Conveyor', 'Action', 'Time']
